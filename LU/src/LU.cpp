@@ -60,7 +60,6 @@ int main()
     multMatrix(L, U, res, n);
     //printMatrix(res, n);
     std::cout << getMaxDiff(res, A, n);
-    //printMatrix(U, n);
     //LU_Decomposition(A, L, U, n);
 
     return 0;

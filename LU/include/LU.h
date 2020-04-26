@@ -78,4 +78,5 @@ double getMaxDiff(double *A, double *B, int n)
     {
         tmp = MAX(tmp, ABS(A[i] - B[i]));
     }
+    return tmp;
 }
