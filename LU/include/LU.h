@@ -77,8 +77,8 @@ void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
 
 void gaussU12(const BMatrix &L11, BMatrix &U12, const BMatrix &A12)
 {
-    //#pragma omp parallel for
-    for (int r = 0; r < A12.row(); r++)
+    #pragma omp parallel for
+    for (int r = 0; r < A12.col(); r++)
     {
         for (int i = U12.row() - 1; i >= 0; i--)
         {
@@ -93,7 +93,7 @@ void gaussU12(const BMatrix &L11, BMatrix &U12, const BMatrix &A12)
 
 void LU_Decomposition(double *A, double *L, double *U, int n)
 {
-    //  ||LU - A||/||A|| < 0.01
+// ||LU - A||/||A|| < 0.01
 #pragma omp parallel for
     for (int i = 0; i < n; i++)
         L[indx(i, i, n)] = 1.0;
@@ -107,7 +107,7 @@ void LU_Decomposition(double *A, double *L, double *U, int n)
 #pragma omp parallel for
     for (int i = 0; i < n*n; i++)
         U[i] = A[i];
-        //этап 1, поиск L11 и U11
+
         for (int ved = 0; ved < n; ved++)
         {
             double el = U[indx(ved, ved, n)];
@@ -146,7 +146,7 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
         #pragma omp parallel for
         for (int i = bi; i < bi + bs; i++)
             for (int j = bi; j < bi + bs; j++)
-            U[indx(i, j, n)] = A[indx(i, j, n)];
+                U[indx(i, j, n)] = A[indx(i, j, n)];
 
         //этап 1, поиск L11 и U11
         for (int ved = bi; ved < MIN(bi + bs, n); ved++)
@@ -160,7 +160,6 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
                 #pragma ivdep
                 for (int j = ved + 1; j < MIN(bi + bs, n); j++)
                     U[indx(i, j, n)] -= coeff * U[indx(ved, j, n)];
-
             }
         }     
 
@@ -168,12 +167,12 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
         BMatrix A11(A, n, bs, bs, bi, bi), L11(L, n, bs, bs, bi, bi), U11(U, n, bs, bs, bi, bi), 
             U12(U, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs),
             A12(A, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs);
-
-        std::vector<double> res(bs*bs);
-        A11.print();
-        BMatrix R(&res[0], bs, bs, bs, 0, 0);
-        blockMultMatrix(L11, U11, R);
-        R.print();
+        
+        //std::vector<double> res(bs*bs);
+        //A11.print();
+        //BMatrix R(&res[0], bs, bs, bs, 0, 0);
+        //blockMultMatrix(L11, U11, R);
+        //R.print();
 
         gaussU12(L11, U12, A12);
 
