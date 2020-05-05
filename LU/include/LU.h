@@ -71,25 +71,92 @@ public:
         std::cout << "\n";
     }
 
+    void blockMultMatrix(const BMatrix &A, const BMatrix &B, const int mbs)
+    {
+        #pragma omp parallel for
+        for (int bi = 0; bi < A.row(); bi += mbs)
+            for (int bj = 0; bj < B.col(); bj += mbs)
+                for (int bk = 0; bk < A.col(); bk += mbs)
+                    for (int i = bi; i < MIN(bi + mbs, A.row()); i++)
+                        for (int k = bk; k < MIN(bk + mbs, B.col()); k++)
+                            #pragma ivdep
+                            for (int j = bj; j < MIN(bj + mbs, A.col()); j++)
+                            {
+                                (*this)(i, j) -= A.get(i, k) * B.get(k, j);
+                            }
+    }
+
 };
-
 void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
+void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
 
+void LU(BMatrix &L11, BMatrix &U11, const BMatrix &A11)
+{
+    #pragma omp parallel for
+    for (int i = 0; i < L11.row(); i++)
+        for (int j = 0; j < L11.col(); j++)
+        {
+            if (i != j)
+                L11(i, j) = 0.0;
+            else L11(i, j) = 1.0;
+        }
+
+    #pragma omp parallel for
+    for (int i = 0; i < A11.row(); i++)
+        for (int j = 0; j < A11.col(); j++)
+            U11(i,j) = A11.get(i,j);
+
+    for (int ved = 0; ved < U11.row(); ved++)
+    {
+        double el = U11(ved, ved);
+        #pragma omp parallel for
+        for (int i = ved + 1; i < U11.row(); i++)
+        {
+            double coeff = U11(i, ved) / el;
+            L11(i, ved) = coeff;
+            #pragma ivdep
+            for (int j = 0; j <= ved; j++)
+                U11(i, j) = 0.0;
+            #pragma ivdep
+            for (int j = ved + 1; j < U11.col(); j++)
+                U11(i, j) -= coeff * U11(ved, j);
+        }
+    }
+}
 void gaussU12(const BMatrix &L11, BMatrix &U12, const BMatrix &A12)
 {
     #pragma omp parallel for
     for (int r = 0; r < A12.col(); r++)
     {
-        for (int i = U12.row() - 1; i >= 0; i--)
-        {
+        #pragma ivdep
+        for (int i = 0; i < U12.row(); i++)
             U12(i, r) = A12.get(i, r);
+
+        for (int i = 1; i < U12.row(); i++)
+        {
             #pragma ivdep
-            for (int j = L11.col() - 1; j > i; j--)
+            for (int j = 0; j < i; j++)
                 U12(i, r) -= L11.get(i, j) * U12(j, r);
         }
     }
 }
-
+void gaussL21(BMatrix &L21, const BMatrix& U11, const BMatrix& A21)
+{
+    for (int rr = 0; rr < A21.row(); rr++)
+    {
+        #pragma ivdep
+        for (int j = 0; j < L21.col(); j++)
+        {
+            L21(rr, j) = A21.get(rr, j) / U11.get(j, j);
+        }
+        for (int j = 1; j < L21.col(); j++)
+        {
+            #pragma ivdep
+            for (int k = 0; k < j; k++)
+                L21(rr, j) -= L21.get(rr, k) * U11.get(k, j)/ U11.get(j, j);
+        }
+    }
+}
 
 void LU_Decomposition(double *A, double *L, double *U, int n)
 {
@@ -134,57 +201,45 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
     for (int bi = 0; bi < n; bi += bs)
     {
         //этап 0, подготовка L11 и U11
-        #pragma omp parallel for
-        for (int i = bi; i < bi + bs; i++)
-            L[indx(i, i, n)] = 1.0;
-
-        #pragma omp parallel for
-        for (int i = bi; i < bi + bs; i++)
-            for (int j = i + 1; j < bi + bs; j++)
-                L[indx(i, j, n)] = 0.0;
-
-        #pragma omp parallel for
-        for (int i = bi; i < bi + bs; i++)
-            for (int j = bi; j < bi + bs; j++)
-                U[indx(i, j, n)] = A[indx(i, j, n)];
-
+        BMatrix A11(A, n, MIN(n - bi, bs), MIN(n - bi, bs), bi, bi),
+                L11(L, n, MIN(n - bi, bs), MIN(n - bi, bs), bi, bi),
+                U11(U, n, MIN(n - bi, bs), MIN(n - bi, bs), bi, bi);
         //этап 1, поиск L11 и U11
-        for (int ved = bi; ved < MIN(bi + bs, n); ved++)
-        {
-            double el = U[indx(ved, ved, n)];
-            #pragma omp parallel for
-            for (int i = ved + 1; i < MIN(bi + bs, n); i++)
-            {
-                double coeff = U[indx(i, ved, n)] / el;
-                L[indx(i, ved, n)] = coeff;
-                #pragma ivdep
-                for (int j = ved + 1; j < MIN(bi + bs, n); j++)
-                    U[indx(i, j, n)] -= coeff * U[indx(ved, j, n)];
-            }
-        }     
+        LU(L11, U11, A11);
 
         //этап 2 поиск U12
-        BMatrix A11(A, n, bs, bs, bi, bi), L11(L, n, bs, bs, bi, bi), U11(U, n, bs, bs, bi, bi), 
-            U12(U, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs),
-            A12(A, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs);
+        BMatrix U12(U, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs),
+                A12(A, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs);
         
+        //L11.print();
+        //U11.print();
         //std::vector<double> res(bs*bs);
-        //A11.print();
         //BMatrix R(&res[0], bs, bs, bs, 0, 0);
-        //blockMultMatrix(L11, U11, R);
+        //multMatrix(L11, U11, R);
         //R.print();
 
         gaussU12(L11, U12, A12);
+        //U12.print();
 
         //этап 3 поиск L21
-
-
-        //этап 4 U -= L21 U12, не трогая U11
+        BMatrix L21(L, n, MIN(n - bi - bs, bs), MIN(n - bi, bs), bi + bs, 0),
+                A21(A, n, MIN(n - bi - bs, bs), MIN(n - bi, bs), bi + bs, 0);
+        gaussL21(L21, U11, A21);
+        //L21.print();
+        //этап 4 A -= L21 U12
+        BMatrix A22(A, n, MIN(n - bi - bs, bs), MIN(n - bi - bs, bs), bi + bs, bi + bs);
+        A22.blockMultMatrix(L21, U12, 48);
+        //A22.print();
     }
+    BMatrix Ures(U, n, n, n, 0, 0), Lres(L, n, n, n, 0, 0);
     #pragma omp parallel for
-    for (int i = 1; i < n; i++)
+    for (int i = 0; i < n; i++)
+    {
         for (int j = 0; j < i; j++)
-            U[indx(i, j, n)] = 0.0;
+            Ures(i, j) = 0.0;
+        for (int j = i + 1; j < n; j++)
+            Lres(i, j) = 0.0;
+    }
 }
 
 void multMatrix(double *A, double *B, double *C, int n)
@@ -196,6 +251,18 @@ void multMatrix(double *A, double *B, double *C, int n)
             for (int j = 0; j < n; j++)
             {
                 C[indx(i, j, n)] += A[indx(i, z, n)] * B[indx(z, j, n)];
+            }
+}
+
+void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
+{
+#pragma omp parallel for
+    for (int i = 0; i < A.row(); i++)
+        for (int z = 0; z < A.col(); z++)
+#pragma ivdep
+            for (int j = 0; j < B.col(); j++)
+            {
+                C(i, j) += A.get(i, z) * B.get(z, j);
             }
 }
 

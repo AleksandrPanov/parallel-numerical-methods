@@ -5,7 +5,7 @@
 
 int main()
 {
-    const int n = 4;
+    const int n = 3;
     double *A, *L, *U, *res;
     A = new double[n*n];
     L = new double[n*n];
@@ -29,12 +29,17 @@ int main()
     //std::cout << t3 << "\n";
     //std::cout << t2/(double)t3 << "\n";
     printMatrix(A, n);
+
     LU_Decomposition_block(A, L, U, n);
+
+    //printMatrix(L, n);
+    //printMatrix(U, n);
+
     //auto t3 = clock() - t2;
     //std::cout << t3 << "\n";
     //
-    //multMatrix(L, U, res, n);
-    ////printMatrix(res, n);
+    multMatrix(L, U, res, n);
+    printMatrix(res, n);
     //std::cout << getMaxDiff(res, A, n);
     return 0;
 }
