@@ -74,14 +74,14 @@ public:
                     for (int i = bi; i < MIN(bi + bs, mA.row()); i++)
                     {
                         const int indxTmp = firstIndex + i * realSize;
+                        const int indxTmpA = mA.firstIndex + i * realSize;
                         for (int k = bk; k < MIN(bk + bs, mA.col()); k++)
                         {
+                            const int indxTmpB = B.firstIndex + k * realSize;
                             const int bjmin = MIN(bj + bs, B.col());
                             #pragma ivdep
                             for (int j = bj; j < bjmin; j++)
-                            {
-                                A[indxTmp + j] -= mA(i, k) * B(k, j);
-                            }
+                                A[indxTmp + j] -= mA.A[indxTmpA + k] * B.A[indxTmpB + j];//A[indxTmp + j] -= mA(i, k) * B(k, j);
                         }
                     }
     }
