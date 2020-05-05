@@ -14,7 +14,7 @@ class BMatrix
 public:
     BMatrix(double *A, int rs, int n, int m, int si, int sj) : A(A), realSize(rs), n(n), m(m), si(si), sj(sj) 
     {
-        firstIndex = indx(si, sj, realSize);
+        firstIndex = indx(si, sj, rs);
     };
     inline double &operator() (int i, int j)
     {
@@ -116,7 +116,7 @@ void gaussU12(const BMatrix &L11, BMatrix &U12, const BMatrix &A12)
 
         for (int i = 1; i < U12.row(); i++)
         {
-            #pragma ivdep
+            #pragma novector
             for (int j = 0; j < i; j++)
                 U12(i, r) -= L11(i, j) * U12(j, r);
         }
@@ -124,18 +124,19 @@ void gaussU12(const BMatrix &L11, BMatrix &U12, const BMatrix &A12)
 }
 void gaussL21(BMatrix &L21, const BMatrix& U11, const BMatrix& A21)
 {
+#pragma omp parallel for
     for (int rr = 0; rr < A21.row(); rr++)
     {
         #pragma ivdep
         for (int j = 0; j < L21.col(); j++)
+            L21(rr, j) = A21(rr, j);
+
+        for (int j = 0; j < L21.col(); j++)
         {
-            L21(rr, j) = A21(rr, j) / U11(j, j);
-        }
-        for (int j = 1; j < L21.col(); j++)
-        {
-            #pragma ivdep
+            #pragma novector
             for (int k = 0; k < j; k++)
-                L21(rr, j) -= L21(rr, k) * U11(k, j)/ U11(j, j);
+                L21(rr, j) -= L21(rr, k) * U11(k, j);
+            L21(rr, j) /= U11(j, j);
         }
     }
 }

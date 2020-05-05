@@ -6,7 +6,7 @@ void generateMatrix(double *A, int n)
 {
     for (int i = 0; i < n*n; i++)
     {
-        A[i] = (std::rand() % 21) / 10.0 - 1.0;
+        A[i] = (std::rand() % 201) / 1.0 - 100.0;
     }
 }
 void transposeMatrix(double *A, double *B, int n)
