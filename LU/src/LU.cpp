@@ -1,6 +1,7 @@
 #include "LU.h"
 #include <cstdlib>
 #include <ctime>
+#include <vector>
 void generateMatrix(double *A, int n)
 {
     for (int i = 0; i < n*n; i++)
@@ -39,7 +40,7 @@ int main()
     //printMatrix(A, n);
 
     auto t1 = clock();
-    LU_Decomposition_block(A, L, U, n);
+    LU_Decomposition(A, L, U, n);
     auto t2 = clock() - t1;
     std::cout << "time " << t2 << "\n";
     //printMatrix(L, n);

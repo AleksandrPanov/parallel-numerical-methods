@@ -30,7 +30,7 @@ int main()
     //printMatrix(res, n);
     //setZero(res, n);
 
-    LU_Decomposition_block(A, L, U, n);
+    LU_Decomposition(A, L, U, n);
     //printMatrix(L, n);
     //printMatrix(U, n);
     blockMultMatrix(L, U, res, n);
