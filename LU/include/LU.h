@@ -86,8 +86,6 @@ public:
                     }
     }
 };
-void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
-void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
 
 void LU(BMatrix &L11, BMatrix &U11, const BMatrix &A11)
 {
@@ -229,28 +227,6 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
             Lres(i, j) = 0.0;
     }
 }
-void multMatrix(double *A, double *B, double *C, int n)
-{
-    #pragma omp parallel for
-    for (int i = 0; i < n; i++)
-        for (int z = 0; z < n; z++)
-            #pragma ivdep
-            for (int j = 0; j < n; j++)
-            {
-                C[indx(i, j, n)] += A[indx(i, z, n)] * B[indx(z, j, n)];
-            }
-}
-void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
-{
-#pragma omp parallel for
-    for (int i = 0; i < A.row(); i++)
-        for (int z = 0; z < A.col(); z++)
-#pragma ivdep
-            for (int j = 0; j < B.col(); j++)
-            {
-                C(i, j) += A(i, z) * B(z, j);
-            }
-}
 void blockMultMatrix(double *A, double *B, double *C, int n)
 {
     const int bs = 48;
@@ -264,21 +240,6 @@ void blockMultMatrix(double *A, double *B, double *C, int n)
                         for (int j = bj; j < MIN(bj + bs, n); j++)
                         {
                             C[i*n + j] += A[i*n + k] * B[k*n + j];
-                        }
-}
-void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
-{
-    const int bs = 48;
-#pragma omp parallel for
-    for (int bi = 0; bi < A.row(); bi += bs)
-        for (int bj = 0; bj < B.col(); bj += bs)
-            for (int bk = 0; bk < A.col(); bk += bs)
-                for (int i = bi; i < MIN(bi + bs, A.row()); i++)
-                    for (int k = bk; k < MIN(bk + bs, A.col()); k++)
-                        #pragma ivdep
-                        for (int j = bj; j < MIN(bj + bs, B.col()); j++)
-                        {
-                            C(i, j) += A(i, k) * B(k, j);
                         }
 }
 double getMaxDiff(double *A, double *B, int n)
