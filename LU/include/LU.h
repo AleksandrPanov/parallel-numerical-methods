@@ -17,19 +17,6 @@ void printMatrix(double *A, int n)
     std::cout << "\n";
     std::cout << "\n";
 }
-void generateMatrix(double *A, int n)
-{
-    for (int i = 0; i < n*n; i++)
-    {
-        A[i] = (std::rand() % 21) / 10.0 - 1.0;
-    }
-}
-void transposeMatrix(double *A, double *B, int n)
-{
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            B[indx(j, i, n)] = A[indx(i, j, n)];
-}
 
 class BMatrix
 {
@@ -51,7 +38,10 @@ public:
     {
         return A[firstIndex + i * realSize + j];
     }
-
+    bool isEmpty()
+    {
+        return (n == 0 || m == 0);
+    }
     int row() const
     {
         return n;
@@ -59,6 +49,14 @@ public:
     int col() const
     {
         return m;
+    }
+    int end_row() const
+    {
+        return row() + si;
+    }
+    int end_col() const
+    {
+        return col() + sj;
     }
     void print() const
     {
@@ -71,16 +69,16 @@ public:
         std::cout << "\n";
     }
 
-    void blockMultMatrix(const BMatrix &A, const BMatrix &B, const int mbs)
+    void blockMultMatrix(const BMatrix &A, const BMatrix &B, const int bs)
     {
         #pragma omp parallel for
-        for (int bi = 0; bi < A.row(); bi += mbs)
-            for (int bj = 0; bj < B.col(); bj += mbs)
-                for (int bk = 0; bk < A.col(); bk += mbs)
-                    for (int i = bi; i < MIN(bi + mbs, A.row()); i++)
-                        for (int k = bk; k < MIN(bk + mbs, B.col()); k++)
+        for (int bi = 0; bi < A.row(); bi += bs)
+            for (int bj = 0; bj < B.col(); bj += bs)
+                for (int bk = 0; bk < A.col(); bk += bs)
+                    for (int i = bi; i < MIN(bi + bs, A.row()); i++)
+                        for (int k = bk; k < MIN(bk + bs, A.col()); k++)
                             #pragma ivdep
-                            for (int j = bj; j < MIN(bj + mbs, A.col()); j++)
+                            for (int j = bj; j < MIN(bj + bs, B.col()); j++)
                             {
                                 (*this)(i, j) -= A.get(i, k) * B.get(k, j);
                             }
@@ -157,7 +155,6 @@ void gaussL21(BMatrix &L21, const BMatrix& U11, const BMatrix& A21)
         }
     }
 }
-
 void LU_Decomposition(double *A, double *L, double *U, int n)
 {
 // ||LU - A||/||A|| < 0.01
@@ -194,10 +191,9 @@ void LU_Decomposition(double *A, double *L, double *U, int n)
         for (int j = 0; j < i; j++)
             U[indx(i, j, n)] = 0.0;
 }
-
 void LU_Decomposition_block(double *A, double *L, double *U, int n) //block version
 {
-    const int bs = 2;
+    const int bs = 1;
     for (int bi = 0; bi < n; bi += bs)
     {
         //этап 0, подготовка L11 и U11
@@ -208,8 +204,8 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
         LU(L11, U11, A11);
 
         //этап 2 поиск U12
-        BMatrix U12(U, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs),
-                A12(A, n, MIN(n - bi, bs), MIN(n - bi - bs, bs), bi, bi + bs);
+        BMatrix U12(U, n, MIN(n - bi, bs), n - U11.end_col(), bi, bi + bs),
+                A12(A, n, MIN(n - bi, bs), n - A11.end_col(), bi, bi + bs);
         
         //L11.print();
         //U11.print();
@@ -218,17 +214,20 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
         //multMatrix(L11, U11, R);
         //R.print();
 
-        gaussU12(L11, U12, A12);
+        if (!U12.isEmpty())
+            gaussU12(L11, U12, A12);
         //U12.print();
 
         //этап 3 поиск L21
-        BMatrix L21(L, n, MIN(n - bi - bs, bs), MIN(n - bi, bs), bi + bs, 0),
-                A21(A, n, MIN(n - bi - bs, bs), MIN(n - bi, bs), bi + bs, 0);
-        gaussL21(L21, U11, A21);
+        BMatrix L21(L, n, n - L11.end_row(), MIN(n - bi, bs), bi + bs, bi),
+                A21(A, n, n - A11.end_row(), MIN(n - bi, bs), bi + bs, bi);
+        if (!L21.isEmpty())
+            gaussL21(L21, U11, A21);
         //L21.print();
         //этап 4 A -= L21 U12
-        BMatrix A22(A, n, MIN(n - bi - bs, bs), MIN(n - bi - bs, bs), bi + bs, bi + bs);
-        A22.blockMultMatrix(L21, U12, 48);
+        BMatrix A22(A, n, n - A11.end_row(), n - A11.end_col(), bi + bs, bi + bs);
+        if (!A22.isEmpty())
+            A22.blockMultMatrix(L21, U12, 48);
         //A22.print();
     }
     BMatrix Ures(U, n, n, n, 0, 0), Lres(L, n, n, n, 0, 0);
@@ -241,7 +240,6 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
             Lres(i, j) = 0.0;
     }
 }
-
 void multMatrix(double *A, double *B, double *C, int n)
 {
     #pragma omp parallel for
@@ -253,7 +251,6 @@ void multMatrix(double *A, double *B, double *C, int n)
                 C[indx(i, j, n)] += A[indx(i, z, n)] * B[indx(z, j, n)];
             }
 }
-
 void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
 {
 #pragma omp parallel for
@@ -265,7 +262,6 @@ void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
                 C(i, j) += A.get(i, z) * B.get(z, j);
             }
 }
-
 void blockMultMatrix(double *A, double *B, double *C, int n)
 {
     const int bs = 48;
@@ -281,7 +277,6 @@ void blockMultMatrix(double *A, double *B, double *C, int n)
                             C[i*n + j] += A[i*n + k] * B[k*n + j];
                         }
 }
-
 void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
 {
     const int bs = 48;
@@ -290,14 +285,13 @@ void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
         for (int bj = 0; bj < B.col(); bj += bs)
             for (int bk = 0; bk < A.col(); bk += bs)
                 for (int i = bi; i < MIN(bi + bs, A.row()); i++)
-                    for (int k = bk; k < MIN(bk + bs, B.col()); k++)
+                    for (int k = bk; k < MIN(bk + bs, A.col()); k++)
                         #pragma ivdep
-                        for (int j = bj; j < MIN(bj + bs, A.col()); j++)
+                        for (int j = bj; j < MIN(bj + bs, B.col()); j++)
                         {
-                            C(i, j) += A.get(i,k) * B.get(k,j);
+                            C(i, j) += A.get(i, k) * B.get(k, j);
                         }
 }
-
 double getMaxDiff(double *A, double *B, int n)
 {
     double tmp = 0.0;

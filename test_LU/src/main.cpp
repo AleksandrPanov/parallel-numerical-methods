@@ -6,7 +6,7 @@ void setZero(double *A, int n)
 }
 int main()
 {
-    const int n = 4;
+    const int n = 15;
     double *A, *L, *U, *res;
     A = new double[n*n];
     L = new double[n*n];
@@ -18,7 +18,7 @@ int main()
         res[i] = 0.0;
     }
     for (int i = 0; i < n; i++)
-            A[indx(i, i, n)] = n;
+        A[indx(i, i, n)] = n;
     std::cout << "A :\n";
     printMatrix(A, n);
     std::cout << "\n";
@@ -31,8 +31,8 @@ int main()
     //setZero(res, n);
 
     LU_Decomposition_block(A, L, U, n);
-    printMatrix(L, n);
-    printMatrix(U, n);
+    //printMatrix(L, n);
+    //printMatrix(U, n);
     multMatrix(L, U, res, n);
     printMatrix(res, n);
 
