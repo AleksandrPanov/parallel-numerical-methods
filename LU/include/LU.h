@@ -206,29 +206,20 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
         //этап 2 поиск U12
         BMatrix U12(U, n, MIN(n - bi, bs), n - U11.end_col(), bi, bi + bs),
                 A12(A, n, MIN(n - bi, bs), n - A11.end_col(), bi, bi + bs);
-        
-        //L11.print();
-        //U11.print();
-        //std::vector<double> res(bs*bs);
-        //BMatrix R(&res[0], bs, bs, bs, 0, 0);
-        //multMatrix(L11, U11, R);
-        //R.print();
 
         if (!U12.isEmpty())
             gaussU12(L11, U12, A12);
-        //U12.print();
 
         //этап 3 поиск L21
         BMatrix L21(L, n, n - L11.end_row(), MIN(n - bi, bs), bi + bs, bi),
                 A21(A, n, n - A11.end_row(), MIN(n - bi, bs), bi + bs, bi);
         if (!L21.isEmpty())
             gaussL21(L21, U11, A21);
-        //L21.print();
+
         //этап 4 A -= L21 U12
         BMatrix A22(A, n, n - A11.end_row(), n - A11.end_col(), bi + bs, bi + bs);
         if (!A22.isEmpty())
             A22.blockMultMatrix(L21, U12, 48);
-        //A22.print();
     }
     BMatrix Ures(U, n, n, n, 0, 0), Lres(L, n, n, n, 0, 0);
     #pragma omp parallel for
