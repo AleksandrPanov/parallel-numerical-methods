@@ -30,23 +30,19 @@ public:
     {
         firstIndex = indx(si, sj, realSize);
     };
-    double get(int i, int j) const
+    inline double &operator() (int i, int j)
     {
         return A[firstIndex + i * realSize + j];
     }
-    double &operator() (int i, int j)
+    inline const double &operator() (int i, int j) const
     {
         return A[firstIndex + i * realSize + j];
     }
-    bool isEmpty()
-    {
-        return (n == 0 || m == 0);
-    }
-    int row() const
+    inline int row() const
     {
         return n;
     }
-    int col() const
+    inline int col() const
     {
         return m;
     }
@@ -63,28 +59,31 @@ public:
         for (int i = 0; i < n; i++)
         {
             for (int j = 0; j < m; j++)
-                std::cout << (*this).get(i, j) << " ";
+                std::cout << (*this)(i, j) << " ";
             std::cout << "\n";
         }
         std::cout << "\n";
     }
 
-    void blockMultMatrix(const BMatrix &A, const BMatrix &B, const int bs)
+    void blockMultMatrix(const BMatrix &mA, const BMatrix &B, const int bs)
     {
         #pragma omp parallel for
-        for (int bi = 0; bi < A.row(); bi += bs)
+        for (int bi = 0; bi < mA.row(); bi += bs)
             for (int bj = 0; bj < B.col(); bj += bs)
-                for (int bk = 0; bk < A.col(); bk += bs)
-                    for (int i = bi; i < MIN(bi + bs, A.row()); i++)
-                        for (int k = bk; k < MIN(bk + bs, A.col()); k++)
+                for (int bk = 0; bk < mA.col(); bk += bs)
+                    for (int i = bi; i < MIN(bi + bs, mA.row()); i++)
+                    {
+                        const int indxTmp = firstIndex + i * realSize;
+                        for (int k = bk; k < MIN(bk + bs, mA.col()); k++)
                         {
                             const int bjmin = MIN(bj + bs, B.col());
                             #pragma ivdep
                             for (int j = bj; j < bjmin; j++)
                             {
-                                (*this)(i, j) -= A.get(i, k) * B.get(k, j);
+                                A[indxTmp + j] -= mA(i, k) * B(k, j);
                             }
                         }
+                    }
     }
 };
 void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
@@ -104,7 +103,7 @@ void LU(BMatrix &L11, BMatrix &U11, const BMatrix &A11)
     #pragma omp parallel for
     for (int i = 0; i < A11.row(); i++)
         for (int j = 0; j < A11.col(); j++)
-            U11(i,j) = A11.get(i,j);
+            U11(i,j) = A11(i,j);
 
     for (int ved = 0; ved < U11.row(); ved++)
     {
@@ -130,13 +129,13 @@ void gaussU12(const BMatrix &L11, BMatrix &U12, const BMatrix &A12)
     {
         #pragma ivdep
         for (int i = 0; i < U12.row(); i++)
-            U12(i, r) = A12.get(i, r);
+            U12(i, r) = A12(i, r);
 
         for (int i = 1; i < U12.row(); i++)
         {
             #pragma ivdep
             for (int j = 0; j < i; j++)
-                U12(i, r) -= L11.get(i, j) * U12(j, r);
+                U12(i, r) -= L11(i, j) * U12(j, r);
         }
     }
 }
@@ -147,13 +146,13 @@ void gaussL21(BMatrix &L21, const BMatrix& U11, const BMatrix& A21)
         #pragma ivdep
         for (int j = 0; j < L21.col(); j++)
         {
-            L21(rr, j) = A21.get(rr, j) / U11.get(j, j);
+            L21(rr, j) = A21(rr, j) / U11(j, j);
         }
         for (int j = 1; j < L21.col(); j++)
         {
             #pragma ivdep
             for (int k = 0; k < j; k++)
-                L21(rr, j) -= L21.get(rr, k) * U11.get(k, j)/ U11.get(j, j);
+                L21(rr, j) -= L21(rr, k) * U11(k, j)/ U11(j, j);
         }
     }
 }
@@ -249,7 +248,7 @@ void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
 #pragma ivdep
             for (int j = 0; j < B.col(); j++)
             {
-                C(i, j) += A.get(i, z) * B.get(z, j);
+                C(i, j) += A(i, z) * B(z, j);
             }
 }
 void blockMultMatrix(double *A, double *B, double *C, int n)
@@ -279,7 +278,7 @@ void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C)
                         #pragma ivdep
                         for (int j = bj; j < MIN(bj + bs, B.col()); j++)
                         {
-                            C(i, j) += A.get(i, k) * B.get(k, j);
+                            C(i, j) += A(i, k) * B(k, j);
                         }
 }
 double getMaxDiff(double *A, double *B, int n)
