@@ -17,7 +17,7 @@ void transposeMatrix(double *A, double *B, int n)
 
 int main()
 {
-    const int n = 1000;
+    const int n = 3000;
     double *A, *L, *U, *res;
     A = new double[n*n];
     L = new double[n*n];

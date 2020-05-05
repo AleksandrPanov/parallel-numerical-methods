@@ -77,13 +77,15 @@ public:
                 for (int bk = 0; bk < A.col(); bk += bs)
                     for (int i = bi; i < MIN(bi + bs, A.row()); i++)
                         for (int k = bk; k < MIN(bk + bs, A.col()); k++)
+                        {
+                            const int bjmin = MIN(bj + bs, B.col());
                             #pragma ivdep
-                            for (int j = bj; j < MIN(bj + bs, B.col()); j++)
+                            for (int j = bj; j < bjmin; j++)
                             {
                                 (*this)(i, j) -= A.get(i, k) * B.get(k, j);
                             }
+                        }
     }
-
 };
 void blockMultMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
 void multMatrix(const BMatrix &A, const BMatrix &B, BMatrix &C);
@@ -193,7 +195,7 @@ void LU_Decomposition(double *A, double *L, double *U, int n)
 }
 void LU_Decomposition_block(double *A, double *L, double *U, int n) //block version
 {
-    const int bs = 1;
+    const int bs = 32;
     for (int bi = 0; bi < n; bi += bs)
     {
         //этап 0, подготовка L11 и U11
@@ -207,19 +209,16 @@ void LU_Decomposition_block(double *A, double *L, double *U, int n) //block vers
         BMatrix U12(U, n, MIN(n - bi, bs), n - U11.end_col(), bi, bi + bs),
                 A12(A, n, MIN(n - bi, bs), n - A11.end_col(), bi, bi + bs);
 
-        if (!U12.isEmpty())
-            gaussU12(L11, U12, A12);
+        gaussU12(L11, U12, A12);
 
         //этап 3 поиск L21
         BMatrix L21(L, n, n - L11.end_row(), MIN(n - bi, bs), bi + bs, bi),
                 A21(A, n, n - A11.end_row(), MIN(n - bi, bs), bi + bs, bi);
-        if (!L21.isEmpty())
-            gaussL21(L21, U11, A21);
+        gaussL21(L21, U11, A21);
 
         //этап 4 A -= L21 U12
         BMatrix A22(A, n, n - A11.end_row(), n - A11.end_col(), bi + bs, bi + bs);
-        if (!A22.isEmpty())
-            A22.blockMultMatrix(L21, U12, 48);
+        A22.blockMultMatrix(L21, U12, 32);
     }
     BMatrix Ures(U, n, n, n, 0, 0), Lres(L, n, n, n, 0, 0);
     #pragma omp parallel for
