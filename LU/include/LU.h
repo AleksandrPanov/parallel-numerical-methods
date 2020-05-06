@@ -6,16 +6,13 @@
 
 class BMatrix
 {
-    int firstIndex;
+    const int firstIndex;
     double *A;
-    int realSize;
-    int n, m;
-    int si, sj;
+    const int realSize;
+    const int n, m;
+    const int si, sj;
 public:
-    BMatrix(double *A, int rs, int n, int m, int si, int sj) : A(A), realSize(rs), n(n), m(m), si(si), sj(sj) 
-    {
-        firstIndex = indx(si, sj, rs);
-    };
+    BMatrix(double *A, int rs, int n, int m, int si, int sj) : A(A), realSize(rs), n(n), m(m), si(si), sj(sj), firstIndex(indx(si, sj, rs)) {};
     __forceinline double &operator() (int i, int j)
     {
         return A[firstIndex + i * realSize + j];
@@ -60,14 +57,14 @@ public:
                     {
                         const double *A = mA.A + mA.firstIndex + i * realSize;
                         double *mThis = this->A + firstIndex + i * realSize;
-                        
-                        for (int k = bk; k < MIN(bk + bs, mA.col()); k++)
+                        const int bkmin = MIN(bk + bs, mA.col());
+                        for (int k = bk; k < bkmin; k++)
                         {
-                            const double *B = &mB.A[mB.firstIndex + k * realSize];
+                            const double *B = mB.A + mB.firstIndex + k * realSize;
                             const int bjmin = MIN(bj + bs, mB.col());
                             #pragma ivdep
                             for (int j = bj; j < bjmin; j++)
-                                mThis[j] -= A[k] * B[j];    //A[indxTmp + j] -= mA(i, k) * B(k, j);
+                                mThis[j] -= A[k] * B[j]; //A[indxTmp + j] -= mA(i, k) * B(k, j);
                         }
                     }
     }
