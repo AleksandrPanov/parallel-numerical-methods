@@ -16,19 +16,19 @@ public:
     {
         firstIndex = indx(si, sj, rs);
     };
-    inline double &operator() (int i, int j)
+    __forceinline double &operator() (int i, int j)
     {
         return A[firstIndex + i * realSize + j];
     }
-    inline const double &operator() (int i, int j) const
+    __forceinline const double &operator() (int i, int j) const
     {
         return A[firstIndex + i * realSize + j];
     }
-    inline int row() const
+    __forceinline int row() const
     {
         return n;
     }
-    inline int col() const
+    __forceinline int col() const
     {
         return m;
     }
@@ -50,23 +50,24 @@ public:
     //    }
     //    std::cout << "\n";
     //}
-    void blockMultMatrix(const BMatrix &mA, const BMatrix &B, const int bs)
+    void blockMultMatrix(const BMatrix &mA, const BMatrix &mB, const int bs)
     {
         #pragma omp parallel for
         for (int bi = 0; bi < mA.row(); bi += bs)
-            for (int bj = 0; bj < B.col(); bj += bs)
+            for (int bj = 0; bj < mB.col(); bj += bs)
                 for (int bk = 0; bk < mA.col(); bk += bs)
                     for (int i = bi; i < MIN(bi + bs, mA.row()); i++)
                     {
-                        const int indxTmp = firstIndex + i * realSize;
-                        const int indxTmpA = mA.firstIndex + i * realSize;
+                        const double *A = mA.A + mA.firstIndex + i * realSize;
+                        double *mThis = this->A + firstIndex + i * realSize;
+                        
                         for (int k = bk; k < MIN(bk + bs, mA.col()); k++)
                         {
-                            const int indxTmpB = B.firstIndex + k * realSize;
-                            const int bjmin = MIN(bj + bs, B.col());
+                            const double *B = &mB.A[mB.firstIndex + k * realSize];
+                            const int bjmin = MIN(bj + bs, mB.col());
                             #pragma ivdep
                             for (int j = bj; j < bjmin; j++)
-                                A[indxTmp + j] -= mA.A[indxTmpA + k] * B.A[indxTmpB + j];//A[indxTmp + j] -= mA(i, k) * B(k, j);
+                                mThis[j] -= A[k] * B[j];    //A[indxTmp + j] -= mA(i, k) * B(k, j);
                         }
                     }
     }

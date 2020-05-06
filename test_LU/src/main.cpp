@@ -6,7 +6,7 @@ void setZero(double *A, int n)
 }
 int main()
 {
-    const int n = 15;
+    const int n = 20;
     double *A, *L, *U, *res;
     A = new double[n*n];
     L = new double[n*n];
@@ -14,7 +14,7 @@ int main()
     res = new double[n*n];
     for (int i = 0; i < n*n; i++)
     {
-        A[i] = 1.0;
+        A[i] = i % (n / 3);
         res[i] = 0.0;
     }
     for (int i = 0; i < n; i++)
