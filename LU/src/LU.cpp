@@ -6,7 +6,7 @@ void generateMatrix(double *A, int n)
 {
     for (int i = 0; i < n*n; i++)
     {
-        A[i] = (std::rand() % 201) / 1.0 - 100.0;
+        A[i] = (std::rand() % 21) / 10.0 - 1.0;
     }
 }
 void transposeMatrix(double *A, double *B, int n)
@@ -31,13 +31,14 @@ int main()
     }
 
     generateMatrix(L, n);
+    //printMatrix(L, n);
     transposeMatrix(L, U, n);
 
     blockMultMatrix(L, U, A, n);
 
     std::vector<double> acopy(A, A + n*n);
 
-    //printMatrix(A, n);
+   //printMatrix(A, n);
 
     auto t1 = clock();
     LU_Decomposition(A, L, U, n);

@@ -233,12 +233,12 @@ void LU_Decomposition_notBlock(double *A, double *L, double *U, int n)
     for (int ved = 0; ved < n; ved++)
     {
         double el = U[indx(ved, ved, n)];
-#pragma omp parallel for
+        #pragma omp parallel for
         for (int i = ved + 1; i < n; i++)
         {
             double coeff = U[indx(i, ved, n)] / el;
             L[indx(i, ved, n)] = coeff;
-            //#pragma ivdep
+            #pragma ivdep
             for (int j = ved + 1; j < n; j++)
                 U[indx(i, j, n)] -= coeff * U[indx(ved, j, n)];
 
