@@ -18,12 +18,14 @@ void transposeMatrix(double *A, double *B, int n)
 
 int main()
 {
-    const int n = 3000;
+    omp_set_num_threads(8);
+    const int n = 2500;
     double *A, *L, *U, *res;
     A = new double[n*n];
     L = new double[n*n];
     U = new double[n*n];
     res = new double[n*n];
+    #pragma omp parallel for
     for (int i = 0; i < n*n; i++) 
     {
         A[i] = 0.0;
@@ -41,7 +43,8 @@ int main()
    //printMatrix(A, n);
 
     auto t1 = clock();
-    LU_Decomposition(A, L, U, n);
+    //LU_Decomposition(A, L, U, n);
+    LU_Decomposition_notBlock(A, L, U, n);
     auto t2 = clock() - t1;
     std::cout << "time " << t2 << "\n";
     //printMatrix(L, n);

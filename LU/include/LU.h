@@ -217,35 +217,40 @@ void LU_Decomposition_notBlock(double *A, double *L, double *U, int n)
 {
     // ||LU - A||/||A|| < 0.01
 #pragma omp parallel for
+#pragma ivdep
     for (int i = 0; i < n; i++)
         L[indx(i, i, n)] = 1.0;
 
 #pragma omp parallel for
     for (int i = 0; i < n; i++)
+        #pragma ivdep
         for (int j = i + 1; j < n; j++)
             L[indx(i, j, n)] = 0.0;
 
 
 #pragma omp parallel for
+#pragma ivdep
     for (int i = 0; i < n*n; i++)
         U[i] = A[i];
 
     for (int ved = 0; ved < n; ved++)
     {
-        double el = U[indx(ved, ved, n)];
+        const double el = U[indx(ved, ved, n)];
+        const double* tmpUR = U + ved * n;
         #pragma omp parallel for
         for (int i = ved + 1; i < n; i++)
         {
-            double coeff = U[indx(i, ved, n)] / el;
+            const double coeff = U[indx(i, ved, n)] / el;
             L[indx(i, ved, n)] = coeff;
+            double* tmpU = U + i * n;
             #pragma ivdep
             for (int j = ved + 1; j < n; j++)
-                U[indx(i, j, n)] -= coeff * U[indx(ved, j, n)];
-
+                tmpU[j] -= coeff * tmpUR[j];
         }
     }
 #pragma omp parallel for
     for (int i = 1; i < n; i++)
+        #pragma ivdep
         for (int j = 0; j < i; j++)
             U[indx(i, j, n)] = 0.0;
 }
