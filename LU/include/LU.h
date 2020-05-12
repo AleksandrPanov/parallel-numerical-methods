@@ -163,7 +163,7 @@ void LU_Decomposition(double *A, double *L, double *U, int n) //block version
 
         //этап 4 A -= L21 U12
         BMatrix A22(A, n, n - A11.end_row(), n - A11.end_col(), bi + bs, bi + bs);
-        A22.blockMultMatrix(L21, U12, 32);
+        A22.blockMultMatrix(L21, U12, 96);
     }
     BMatrix Ures(U, n, n, n, 0, 0), Lres(L, n, n, n, 0, 0);
     #pragma omp parallel for
