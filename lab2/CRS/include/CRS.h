@@ -1,7 +1,39 @@
 #include <omp.h>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 using namespace std;
+
+#define MIN(a, b) ((a) <=(b) ? (a) : (b))
+
+double scalar(const double *vec1, const double *vec2, int n)
+{
+    double res = 0.0;
+    //#pragma omp parallel for reduction(+:res)
+    for (int i = 0; i < n; i++)
+    {
+        res += vec1[i] * vec2[i];
+    }
+    return res;
+}
+void addVector(const double* vec1, const double* vec2, const double alpha, double* res, const int n)
+{
+    //#pragma omp parallel for
+    //#pragma ivdep
+    for (int i = 0; i < n; i++)
+    {
+        res[i] = vec1[i] + alpha * vec2[i];
+    }
+}
+void subtractVector(const double* vec1, const double* vec2, const double alpha, double* res, const int n)
+{
+    //#pragma omp parallel for
+    //#pragma ivdep
+    for (int i = 0; i < n; i++)
+    {
+        res[i] = vec1[i] - alpha * vec2[i];
+    }
+}
 
 struct CRSMatrix
 {
@@ -78,16 +110,17 @@ struct CRSMatrix
         cout << "\n";
     }
 
-    vector<double> mul(const vector<double> &vec)
+    void mul(const double* vec, double* res) const
     {
-        vector<double> res(n);
         //curIndx должен быть свой дл€ каждого потока: indexThread*(n/numThreads)
         int curIndx = 0;
+        //tmpTr должен быть свой дл€ каждого потока
         vector<double> tmpTr(n);
         for (int i = 0; i < n; i++)
         {
             const int rowElements = rowPtr[i + 1] - rowPtr[i];
             const int endRow = curIndx + rowElements;
+            res[i] = 0.0;
             for (curIndx; curIndx < endRow; curIndx++)
             {
                 const int j = colIndex[curIndx];
@@ -95,14 +128,80 @@ struct CRSMatrix
                 if (j != i)
                     tmpTr[j] += val[curIndx] * vec[i];
             }
+            //должна быть редукци€ в res[i]
             res[i] += tmpTr[i];
+            tmpTr[i] = 0.0;
         }
-        
-        return res;
     }
 };
 
 void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double * x, int & count)
 {
+    /// initialization
+    const int n = A.n;
+    double alpha, beta;
+    vector<double> r0(n), r1(n, 0.0), Ap(n, 0.0), p;
 
+    //#pragma omp parallel for
+    //#pragma ivdep
+    for (int i = 0; i < n; i++)
+        x[i] = 0.0;
+    
+    /// calculate
+    // r0 = Ax0
+    A.mul(x, &r0[0]);
+    //#pragma omp parallel for
+    //#pragma ivdep
+    for (int i = 0; i < n; i++)
+        r0[i] = b[i] - r0[i];
+
+    //p = r0
+    p = r0;
+
+    for (count = 0; count < max_iter; count++)
+    {
+        //Ќа softgader ошибка считаетс€ по другому
+        double error = sqrt(scalar(&r0[0], &r0[0], n));
+        if (error < eps)
+            break;
+        // alpha_i
+        A.mul(&p[0], &Ap[0]);
+        alpha = scalar(&r0[0], &r0[0], n) / scalar(&Ap[0], &p[0], n);
+        
+        // x_i+1
+        addVector(&x[0], &p[0], alpha, &x[0], n);
+
+        // r_i+1
+        subtractVector(&r0[0], &Ap[0], alpha, &r1[0], n);
+
+        // beta_i
+        beta = scalar(&r1[0], &r1[0], n) / scalar(&r0[0], &r0[0], n);
+
+        // p_i+1
+        addVector(&r1[0], &p[0], beta, &p[0], n);
+
+        // r_0 = r_i
+        r0 = r1;
+    }
+
+}
+
+
+void blockMultMatrix(double *A, double *B, double *C, int n1, int m1, int n2, int m2)
+{
+    const int bs = 48;
+#pragma omp parallel for
+    for (int bi = 0; bi < n1; bi += bs)
+        for (int bj = 0; bj < m2; bj += bs)
+            for (int bk = 0; bk < m1; bk += bs)
+                for (int i = bi; i < MIN(bi + bs, n1); i++)
+                    for (int k = bk; k < MIN(bk + bs, m1); k++)
+                    {
+                        const int bjmin = MIN(bj + bs, m2);
+#pragma ivdep
+                        for (int j = bj; j < bjmin; j++)
+                        {
+                            C[i*m2 + j] += A[i*m1 + k] * B[k*m2 + j];
+                        }
+                    }
 }

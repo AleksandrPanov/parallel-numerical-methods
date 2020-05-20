@@ -18,7 +18,7 @@ void transposeMatrix(double *A, double *B, int n)
 
 int main()
 {
-    omp_set_num_threads(8);
+    //omp_set_num_threads(8);
     const int n = 4000;
     double *A, *L, *U, *res;
     A = new double[n*n];
@@ -36,7 +36,7 @@ int main()
     //printMatrix(L, n);
     transposeMatrix(L, U, n);
 
-    blockMultMatrix(L, U, A, n);
+    blockMultMatrix(L, U, A, n, n, n, n);
 
     std::vector<double> acopy(A, A + n*n);
 
@@ -50,7 +50,7 @@ int main()
     //printMatrix(U, n);
 
 
-    blockMultMatrix(L, U, res, n);
+    blockMultMatrix(L, U, res, n, n, n, n);
     //printMatrix(res, n);
     std::cout << getMaxDiff(res, &acopy[0], n);
     return 0;

@@ -189,19 +189,19 @@ void printMatrix(double *A, int n)
     std::cout << "\n";
 }
 
-void blockMultMatrix(double *A, double *B, double *C, int n)
+void blockMultMatrix(double *A, double *B, double *C, int n1, int m1, int n2, int m2)
 {
     const int bs = 48;
 #pragma omp parallel for
-    for (int bi = 0; bi < n; bi += bs)
-        for (int bj = 0; bj < n; bj += bs)
-            for (int bk = 0; bk < n; bk += bs)
-                for (int i = bi; i < MIN(bi + bs, n); i++)
-                    for (int k = bk; k < MIN(bk + bs, n); k++)
-#pragma ivdep
-                        for (int j = bj; j < MIN(bj + bs, n); j++)
+    for (int bi = 0; bi < n1; bi += bs)
+        for (int bj = 0; bj < m2; bj += bs)
+            for (int bk = 0; bk < m1; bk += bs)
+                for (int i = bi; i < MIN(bi + bs, n1); i++)
+                    for (int k = bk; k < MIN(bk + bs, m1); k++)
+                        #pragma ivdep
+                        for (int j = bj; j < MIN(bj + bs, m2); j++)
                         {
-                            C[i*n + j] += A[i*n + k] * B[k*n + j];
+                            C[i*n1 + j] += A[i*n1 + k] * B[k*n1 + j];
                         }
 }
 double getMaxDiff(double *A, double *B, int n)

@@ -18,7 +18,9 @@ int main()
         res[i] = 0.0;
     }
     for (int i = 0; i < n; i++)
+    {
         A[indx(i, i, n)] = n;
+    }
     std::cout << "A :\n";
     printMatrix(A, n);
     std::cout << "\n";
@@ -33,7 +35,7 @@ int main()
     LU_Decomposition(A, L, U, n);
     //printMatrix(L, n);
     //printMatrix(U, n);
-    blockMultMatrix(L, U, res, n);
+    blockMultMatrix(L, U, res, n, n, n, n);
     printMatrix(res, n);
 
     return 0;
