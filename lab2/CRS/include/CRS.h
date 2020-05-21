@@ -98,9 +98,9 @@ struct SLECRSMatrix
     const int &m; // Число столбцов в матрице
     const int &nz; // Число ненулевых элементов в разреженной симметричной матрице, лежащих не ниже главной диагонали
     const vector<double> &val; // Массив значений матрицы по строкам
-    const vector<int> &colIndex; // Массив номеров столбцов
+    const vector<int> &colIndexes; // Массив номеров столбцов
     const vector<int> &rowPtr; // Массив индексов начала строк
-    SLECRSMatrix(const CRSMatrix &matr):n(matr.n), m(matr.m), nz(matr.nz), val(matr.val), colIndex(matr.colIndex), rowPtr(matr.rowPtr){}
+    SLECRSMatrix(const CRSMatrix &matr):n(matr.n), m(matr.m), nz(matr.nz), val(matr.val), colIndexes(matr.colIndex), rowPtr(matr.rowPtr){}
 
     void printAsMatrix() const // нули, на месте где должны быть элементы симметричной матрицы
     {
@@ -114,7 +114,7 @@ struct SLECRSMatrix
 
             for (curIndx; curIndx < endRow; curIndx++)
             {
-                const int col = colIndex[curIndx];
+                const int col = colIndexes[curIndx];
                 row[col] = val[curIndx];
             }
             for (int j = 0; j < m; j++)
@@ -135,7 +135,7 @@ struct SLECRSMatrix
 
             for (curIndx; curIndx < endRow; curIndx++)
             {
-                const int col = colIndex[curIndx];
+                const int col = colIndexes[curIndx];
                 res[i*m + col] = val[curIndx];
                 res[col*m + i] = val[curIndx];
             }
@@ -145,27 +145,44 @@ struct SLECRSMatrix
         }
         cout << "\n";
     }
-    void mul(const double* vec, double* res) const
+    void mul(const double* vec, double* res, double* t) const
     {
-        //curIndx должен быть свой для каждого потока: indexThread*(n/numThreads)
-        int curIndx = 0;
-        //tmpTr должен быть свой для каждого потока
-        vector<double> tmpTr(n);
-        for (int i = 0; i < n; i++)
+        const int numThreads = omp_get_max_threads();
+        #pragma omp parallel
         {
-            const int rowElements = rowPtr[i + 1] - rowPtr[i];
-            const int endRow = curIndx + rowElements;
-            res[i] = 0.0;
-            for (curIndx; curIndx < endRow; curIndx++)
+            const int indxThread = omp_get_thread_num();
+            const int size = n / numThreads;
+            const int start = indxThread * size;
+            const int end = MIN(start + size + (indxThread == numThreads - 1) * n % numThreads, n);
+            double *tmp = t + indxThread * n;
+            //elIndx должен быть свой для каждого потока
+            int elIndx = rowPtr[start];
+            for (int i = start; i < end; i++)
             {
-                const int j = colIndex[curIndx];
-                res[i] += val[curIndx] * vec[j];
-                if (j != i)
-                    tmpTr[j] += val[curIndx] * vec[i];
+                const int endRow = elIndx + (rowPtr[i + 1] - rowPtr[i]);
+                res[i] = 0.0;
+                for (elIndx; elIndx < endRow; elIndx++)
+                {
+                    const int j = colIndexes[elIndx];
+                    res[i] += val[elIndx] * vec[j];
+                    if (j != i)
+                    {
+                        tmp[j] += val[elIndx] * vec[i];
+                    }
+                }
             }
-            //должна быть редукция в res[i]
-            res[i] += tmpTr[i];
-            tmpTr[i] = 0.0;
+        }
+        //редукция в res[i]
+        for (int thr = 0; thr < numThreads; thr++)
+        {
+            double *tmp = t + thr * n;
+            #pragma omp parallel for
+            #pragma ivdep
+            for (int i = 0; i < n; i++)
+            {
+                res[i] += tmp[i];
+                tmp[i] = 0.0;
+            }
         }
     }
 };
@@ -176,8 +193,7 @@ void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double 
     const int n = A.n;
     double alpha, beta;
     SLECRSMatrix mA(A);
-    vector<double> r0(n, 0.0), r1(n, 0.0), Ap(n, 0.0), p(n, 0.0), x0(n, 0.0);
-
+    vector<double> r0(n, 0.0), r1(n, 0.0), Ap(n, 0.0), p(n, 0.0), x0(n, 0.0), tmp(omp_get_max_threads() * n, 0.0);
     #pragma omp parallel for
     #pragma ivdep
     for (int i = 0; i < n; i++)
@@ -185,7 +201,7 @@ void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double 
     
     /// calculate
     // r0 = Ax0
-    mA.mul(x, &r0[0]);
+    mA.mul(x, &r0[0], &tmp[0]);
     // r0 = b - Ax0
     #pragma omp parallel for
     #pragma ivdep
@@ -203,7 +219,7 @@ void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double 
         //    break;
 
         // alpha_i
-        mA.mul(&p[0], &Ap[0]);
+        mA.mul(&p[0], &Ap[0], &tmp[0]);
         alpha = scalar(&r0[0], &r0[0], n) / scalar(&Ap[0], &p[0], n);
         
         // копируем в x0 "предыдущий" ответ
