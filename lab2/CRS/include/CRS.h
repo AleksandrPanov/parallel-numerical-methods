@@ -6,20 +6,41 @@ using namespace std;
 
 #define MIN(a, b) ((a) <=(b) ? (a) : (b))
 
-double scalar(const double *vec1, const double *vec2, int n)
+double scalar(const double *vec1, const double *vec2, const int n)
 {
     double res = 0.0;
-    //#pragma omp parallel for reduction(+:res)
+    #pragma omp parallel for reduction(+:res)
     for (int i = 0; i < n; i++)
     {
         res += vec1[i] * vec2[i];
     }
     return res;
 }
+double gerError(const double* x0, const double* x1, const double* b, const int n)
+{
+    double error1 = 0.0;
+    double error2 = 0.0;
+    #pragma omp parallel for reduction(+:error1, error2)
+    for (int i = 0; i < n; i++)
+    {
+        error1 += (x1[i] - x0[i]) * (x1[i] - x0[i]);
+        error2 += b[i] * b[i];
+    }
+    return sqrt(error1) / sqrt(error2);
+}
+void copy_ar(const double *vec, double *res, int n)
+{
+    #pragma omp parallel for
+    #pragma ivdep
+    for (int i = 0; i < n; i++)
+    {
+        res[i] = vec[i];
+    }
+}
 void addVector(const double* vec1, const double* vec2, const double alpha, double* res, const int n)
 {
-    //#pragma omp parallel for
-    //#pragma ivdep
+    #pragma omp parallel for
+    #pragma ivdep
     for (int i = 0; i < n; i++)
     {
         res[i] = vec1[i] + alpha * vec2[i];
@@ -27,13 +48,15 @@ void addVector(const double* vec1, const double* vec2, const double alpha, doubl
 }
 void subtractVector(const double* vec1, const double* vec2, const double alpha, double* res, const int n)
 {
-    //#pragma omp parallel for
-    //#pragma ivdep
+    #pragma omp parallel for
+    #pragma ivdep
     for (int i = 0; i < n; i++)
     {
         res[i] = vec1[i] - alpha * vec2[i];
     }
 }
+
+struct CRSMatrix;
 
 struct CRSMatrix
 {
@@ -43,7 +66,7 @@ struct CRSMatrix
     vector<double> val; // Массив значений матрицы по строкам
     vector<int> colIndex; // Массив номеров столбцов
     vector<int> rowPtr; // Массив индексов начала строк
-    CRSMatrix(vector<double> &A, int n): n(n), m(n)
+    CRSMatrix(vector<double> &A, int n) : n(n), m(n)
     {
         rowPtr.push_back(0);
         for (int i = 0; i < n; i++)
@@ -64,6 +87,20 @@ struct CRSMatrix
         }
         nz = rowPtr.back();
     }
+
+
+};
+
+
+struct SLECRSMatrix
+{
+    const int &n; // Число строк в матрице
+    const int &m; // Число столбцов в матрице
+    const int &nz; // Число ненулевых элементов в разреженной симметричной матрице, лежащих не ниже главной диагонали
+    const vector<double> &val; // Массив значений матрицы по строкам
+    const vector<int> &colIndex; // Массив номеров столбцов
+    const vector<int> &rowPtr; // Массив индексов начала строк
+    SLECRSMatrix(const CRSMatrix &matr):n(matr.n), m(matr.m), nz(matr.nz), val(matr.val), colIndex(matr.colIndex), rowPtr(matr.rowPtr){}
 
     void printAsMatrix() const // нули, на месте где должны быть элементы симметричной матрицы
     {
@@ -86,7 +123,6 @@ struct CRSMatrix
         }
         cout << "\n";
     }
-
     void printAsSimMatrix() const // вывод симметричной матрицы
     {
         int curIndx = 0;
@@ -109,7 +145,6 @@ struct CRSMatrix
         }
         cout << "\n";
     }
-
     void mul(const double* vec, double* res) const
     {
         //curIndx должен быть свой для каждого потока: indexThread*(n/numThreads)
@@ -140,34 +175,41 @@ void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double 
     /// initialization
     const int n = A.n;
     double alpha, beta;
-    vector<double> r0(n), r1(n, 0.0), Ap(n, 0.0), p;
+    SLECRSMatrix mA(A);
+    vector<double> r0(n, 0.0), r1(n, 0.0), Ap(n, 0.0), p(n, 0.0), x0(n, 0.0);
 
-    //#pragma omp parallel for
-    //#pragma ivdep
+    #pragma omp parallel for
+    #pragma ivdep
     for (int i = 0; i < n; i++)
         x[i] = 0.0;
     
     /// calculate
     // r0 = Ax0
-    A.mul(x, &r0[0]);
-    //#pragma omp parallel for
-    //#pragma ivdep
+    mA.mul(x, &r0[0]);
+    // r0 = b - Ax0
+    #pragma omp parallel for
+    #pragma ivdep
     for (int i = 0; i < n; i++)
         r0[i] = b[i] - r0[i];
 
     //p = r0
-    p = r0;
+    copy_ar(&r0[0], &p[0], n);
 
     for (count = 0; count < max_iter; count++)
     {
         //На softgader ошибка считается по другому
-        double error = sqrt(scalar(&r0[0], &r0[0], n));
-        if (error < eps)
-            break;
+        //double error = sqrt(scalar(&r0[0], &r0[0], n));
+        //if (error < eps)
+        //    break;
+
         // alpha_i
-        A.mul(&p[0], &Ap[0]);
+        mA.mul(&p[0], &Ap[0]);
         alpha = scalar(&r0[0], &r0[0], n) / scalar(&Ap[0], &p[0], n);
         
+        // копируем в x0 "предыдущий" ответ
+        // x_i = x_i+1
+        copy_ar(&x[0], &x0[0], n);
+
         // x_i+1
         addVector(&x[0], &p[0], alpha, &x[0], n);
 
@@ -181,7 +223,14 @@ void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double 
         addVector(&r1[0], &p[0], beta, &p[0], n);
 
         // r_0 = r_i
-        r0 = r1;
+        copy_ar(&r1[0], &r0[0], n);
+
+        double error = gerError(&x0[0], x, b, n);
+        if (error < eps)
+        {
+            count++;
+            return;
+        }
     }
 
 }

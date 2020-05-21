@@ -1,4 +1,4 @@
- #include "CRS.h"
+#include "CRS.h"
 #include <ctime>
 
 void generateMatrix(double *A, const int n, const int m)
@@ -32,7 +32,8 @@ int main()
     //generateMatrix(&Atmp[0], n, n);
     //generateMatrix(&vec[0], n, 1);
 
-    CRSMatrix A = CRSMatrix(Atmp, n);
+    CRSMatrix tmp(CRSMatrix(Atmp, n));
+    SLECRSMatrix A(tmp);
     A.printAsSimMatrix();
 
     vector<double> res(n);
@@ -47,7 +48,7 @@ int main()
     print(res2, n, 1);
 
     int count = 0;
-    SLE_Solver_CRS(A, &vec[0], 0.001, 100, &res[0], count);
+    SLE_Solver_CRS(tmp, &vec[0], 0.01, 100, &res[0], count);
     print(res, n, 1);
 
     std::cout << "num iteration: " << count;
