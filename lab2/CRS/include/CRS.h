@@ -1,3 +1,5 @@
+#pragma once
+
 #include <omp.h>
 #include <vector>
 #include <iostream>
@@ -56,8 +58,6 @@ void subtractVector(const double* vec1, const double* vec2, const double alpha, 
     }
 }
 
-struct CRSMatrix;
-
 struct CRSMatrix
 {
     int n; // Число строк в матрице
@@ -66,6 +66,7 @@ struct CRSMatrix
     vector<double> val; // Массив значений матрицы по строкам
     vector<int> colIndex; // Массив номеров столбцов
     vector<int> rowPtr; // Массив индексов начала строк
+    CRSMatrix():n(0), m(0), nz(0){}
     CRSMatrix(vector<double> &A, int n) : n(n), m(n)
     {
         rowPtr.push_back(0);
@@ -87,10 +88,7 @@ struct CRSMatrix
         }
         nz = rowPtr.back();
     }
-
-
 };
-
 
 struct SLECRSMatrix
 {
@@ -101,50 +99,6 @@ struct SLECRSMatrix
     const vector<int> &colIndexes; // Массив номеров столбцов
     const vector<int> &rowPtr; // Массив индексов начала строк
     SLECRSMatrix(const CRSMatrix &matr):n(matr.n), m(matr.m), nz(matr.nz), val(matr.val), colIndexes(matr.colIndex), rowPtr(matr.rowPtr){}
-
-    void printAsMatrix() const // нули, на месте где должны быть элементы симметричной матрицы
-    {
-        int curIndx = 0;
-        // идем по строкам:
-        for (int i = 0; i < rowPtr.size() - 1; i++)
-        {
-            vector<double> row(m, 0.0);
-            int rowElements = rowPtr[i + 1] - rowPtr[i];
-            int endRow = curIndx + rowElements;
-
-            for (curIndx; curIndx < endRow; curIndx++)
-            {
-                const int col = colIndexes[curIndx];
-                row[col] = val[curIndx];
-            }
-            for (int j = 0; j < m; j++)
-                cout << row[j] << " ";
-            cout << "\n";
-        }
-        cout << "\n";
-    }
-    void printAsSimMatrix() const // вывод симметричной матрицы
-    {
-        int curIndx = 0;
-        vector<double> res(n*m, 0.0);
-        // идем по строкам:
-        for (int i = 0; i < n; i++)
-        {
-            const int rowElements = rowPtr[i + 1] - rowPtr[i];
-            const int endRow = curIndx + rowElements;
-
-            for (curIndx; curIndx < endRow; curIndx++)
-            {
-                const int col = colIndexes[curIndx];
-                res[i*m + col] = val[curIndx];
-                res[col*m + i] = val[curIndx];
-            }
-            for (int j = 0; j < m; j++)
-                cout << res[i*m + j] << " ";
-            cout << "\n";
-        }
-        cout << "\n";
-    }
     void mul(const double* vec, double* res, double* t) const
     {
         const int numThreads = omp_get_max_threads();
@@ -186,7 +140,6 @@ struct SLECRSMatrix
         }
     }
 };
-
 void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double * x, int & count)
 {
     /// initialization
@@ -250,7 +203,6 @@ void SLE_Solver_CRS(CRSMatrix & A, double * b, double eps, int max_iter, double 
     }
 
 }
-
 
 void blockMultMatrix(double *A, double *B, double *C, int n1, int m1, int n2, int m2)
 {
