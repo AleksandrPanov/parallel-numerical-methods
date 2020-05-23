@@ -107,9 +107,11 @@ struct SLECRSMatrix
             const int indxThread = omp_get_thread_num();
             const int size = n / numThreads;
             const int start = indxThread * size;
-            const int end = MIN(start + size + (indxThread == numThreads - 1) * n % numThreads, n);
+            int ostatok = 0;
+            if (indxThread == numThreads - 1)
+                ostatok = n % numThreads;
+            const int end = start + size + ostatok;
             double *tmp = t + indxThread * n;
-            //elIndx должен быть свой для каждого потока
             int elIndx = rowPtr[start];
             for (int i = start; i < end; i++)
             {
@@ -118,16 +120,15 @@ struct SLECRSMatrix
                 for (elIndx; elIndx < endRow; elIndx++)
                 {
                     const int j = colIndexes[elIndx];
-                    res[i] += val[elIndx] * vec[j];
+                    const double vv = val[elIndx];
+                    res[i] += vv * vec[j];
                     if (j != i)
-                    {
-                        tmp[j] += val[elIndx] * vec[i];
-                    }
+                        tmp[j] += vv * vec[i];
                 }
             }
         }
         //редукция в res[i]
-        for (int thr = 0; thr < numThreads; thr++)
+        for (int thr = numThreads - 1; thr >= 0; thr--)
         {
             double *tmp = t + thr * n;
             #pragma omp parallel for

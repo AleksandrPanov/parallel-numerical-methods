@@ -102,6 +102,6 @@ double getError(const SLECRSMatrix &A, const vector<double> &vec, const vector<d
     //res = Ax
     A.mul(&x[0], &res[0], &t[0]);
     //res = Ax - b
-    subtractVector(& res[0], &vec[0], 1.0, &res[0], n);
+    subtractVector(&res[0], &vec[0], 1.0, &res[0], n);
     return sqrt(scalar(&res[0], &res[0], n));
 }

@@ -6,6 +6,12 @@
 
 int main()
 {
+    // 1 thread 20
+    // 2 thread 10.8
+    // 4 thread 6.2
+    // 6 thread 5.1
+    // 8 thread 4.7
+    omp_set_num_threads(4);
     const int n = 18000;
     const int len = 3;
     CRSMatrix tmp = generateCRSMatrix(n, len);
@@ -18,7 +24,7 @@ int main()
 
     int count = 0;
     int time1 = clock();
-    SLE_Solver_CRS(tmp, &vec[0], 0.001 * 0.001, 1000*1000, &res[0], count);
+    SLE_Solver_CRS(tmp, &vec[0], 0.0, 80*1000, &res[0], count);
     int time2 = clock() - time1;
     cout << "time: " << time2 << "\n";
 
