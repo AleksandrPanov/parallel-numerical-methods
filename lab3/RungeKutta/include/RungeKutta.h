@@ -4,24 +4,24 @@ class heat_task {
 public:
     int n = 50000; // размер сетки по x
     int m = 50000; // размер сетки по t
-    double L = 100; // длина стержня
+    double L = 100.0; // длина стержня
     double T = 0.1; // момент времени, в который необходимо аппроксимировать u(x, t)
     double initial_condition(double x) { // функция, задающая начальное условие
-        return pow(x, 4);
+        return -x * x + 100.0*x + cos(x);
     }
     double left_condition(double t) { // функция, задающая граничное условие при x = 0
-        return pow(t, 4);
+        return t*t*t + cos(0.0);
     }
     double right_condition(double t) { // функция, задающая граничное условие при x = L
-        return pow(L, 4) + pow(t, 4);
+        return -L*L + 100.0*L + t*t*t + cos(L);
     }
     double f(double x, double t) { // функция, задающая внешнее воздействие
-        return 4 * pow(t, 3) - 12 * pow(x, 2);
+        return 2 + 3 * t*t + cos(x);
     }
     double u(double x, double t) {
-        return pow(x, 4) + pow(t, 4);
+        return -x * x + 100.0*x + t * t*t + cos(x);
     }
-    double error(double v, double x, double t) {
+    double getError(double v, double x, double t) {
         return abs(v - u(x, t));
     }
 };
@@ -55,15 +55,10 @@ void calc_k2(heat_task &task, const double *v, const double *k1, double *k2, dou
     tmp[n] = task.right_condition(t);
     #pragma omp parallel for
     for (int i = 1; i < n; i++)
-    {
         tmp[i] = v[i] + dt * k1[i];
-    }
     #pragma omp parallel for
     for (int i = 1; i < n; i++)
-    {
         k2[i] = coeff * (tmp[i + 1] - 2 * tmp[i] + tmp[i - 1]) + task.f(h*i, t);
-    }
-
 }
 void calc_k3(heat_task &task, const double *v, const double *k2, double *k3, double t, double *tmp)
 {

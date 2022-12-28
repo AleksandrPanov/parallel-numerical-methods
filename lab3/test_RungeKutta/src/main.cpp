@@ -10,14 +10,14 @@ double error(heat_task task, double * v)
     double err = 0;
     for (int i = 0; i < task.n + 1; i++) 
     {
-        err = max(err, task.error(v[i], i*(task.L / task.n), task.T));
+        err = max(err, task.getError(v[i], i*(task.L / task.n), task.T));
     }
     return err;
 }
 
 int main() 
 {
-    omp_set_num_threads(4);
+    //omp_set_num_threads(6);
     heat_task task;
     if (task.m < 2 * task.T*pow((task.n / task.L), 2)) 
     {
